@@ -1,32 +1,66 @@
+// /src/app/delete/[id]/page.tsx
 'use client';
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, useParams } from 'next/navigation'; // Use useParams from next/navigation
+import { Alert, Button } from 'react-bootstrap';
 
 const DeleteEmployeePage = () => {
-  const [employee, setEmployee] = useState<any>(null);
+  const [employee, setEmployee] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
-  const { id } = router.query;
+  const { id } = useParams(); // Get the dynamic id from the URL
 
   useEffect(() => {
     if (id) {
-      const employeeData: { [key: number]: { id: number; name: string; role: string } } = {
-        1: { id: 1, name: 'John Doe', role: 'Software Engineer' },
-        2: { id: 2, name: 'Jane Smith', role: 'Product Manager' },
-        3: { id: 3, name: 'Mark Johnson', role: 'Designer' },
+      const fetchEmployeeData = async () => {
+        try {
+          // Fetch employee data based on the dynamic 'id'
+          const response = await fetch(`https://dummy.restapiexample.com/api/v1/employee/${id}`);
+          const data = await response.json();
+
+          if (response.ok && data.status === 'success') {
+            setEmployee(data.data);
+          } else {
+            throw new Error('Employee not found');
+          }
+        } catch (error: any) {
+          setError(error.message);
+        } finally {
+          setLoading(false);
+        }
       };
-      // Ensure id is treated as a number
-      const employeeId = Number(id);
-      setEmployee(employeeData[employeeId]);
+
+      fetchEmployeeData();
     }
   }, [id]);
 
-  const handleDelete = () => {
-    alert('Employee Deleted');
-    router.push('/employees');
+  const handleDelete = async () => {
+    try {
+      // Call the delete API to delete the employee
+      const response = await fetch(`https://dummy.restapiexample.com/api/v1/delete/${id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        alert('Employee successfully deleted');
+        router.push('/employees'); // Redirect back to the employee list
+      } else {
+        throw new Error('Failed to delete employee');
+      }
+    } catch (error: any) {
+      setError(error.message);
+    }
   };
 
-  if (!employee) {
+  if (loading) {
     return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <Alert variant="danger">{error}</Alert>;
   }
 
   return (
@@ -35,12 +69,12 @@ const DeleteEmployeePage = () => {
       <div className="alert alert-danger" role="alert">
         Are you sure you want to delete employee <strong>{employee.name}</strong>?
       </div>
-      <button className="btn btn-danger" onClick={handleDelete}>
+      <Button variant="danger" onClick={handleDelete}>
         Delete
-      </button>
-      <button className="btn btn-secondary ms-2" onClick={() => router.push('/employees')}>
+      </Button>
+      <Button variant="secondary" className="ms-2" onClick={() => router.push('/employees')}>
         Cancel
-      </button>
+      </Button>
     </div>
   );
 };

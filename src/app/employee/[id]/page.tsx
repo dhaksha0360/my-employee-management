@@ -2,40 +2,57 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Button } from 'react-bootstrap';
+import { Button, Alert } from 'react-bootstrap';
 
 const ViewEmployeePage = () => {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;  // Handle string or string[]
 
   const [employee, setEmployee] = useState<any | null>(null);
-  const [employeeIndex, setEmployeeIndex] = useState<number | null>(null); // Store index of employee
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     if (id) {
-      const storedEmployees = JSON.parse(localStorage.getItem('employees') || '[]');
-      const employee = storedEmployees.find((emp: any) => emp.id === parseInt(id));
-      setEmployee(employee);
+      const fetchEmployeeData = async () => {
+        try {
+          const response = await fetch(`https://dummy.restapiexample.com/api/v1/employee/${id}`);
+          const data = await response.json();
 
-      // Find the index of the employee in the array for sequential ID
-      const index = storedEmployees.findIndex((emp: any) => emp.id === parseInt(id));
-      setEmployeeIndex(index);
+          if (response.ok && data.status === 'success') {
+            setEmployee(data.data);
+          } else {
+            throw new Error('Employee not found');
+          }
+        } catch (error: any) {
+          setError(error.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchEmployeeData();
     }
   }, [id]);
 
   return (
     <div className="container mt-5">
       <h1 className="mb-4">View Employee</h1>
-      {employee ? (
-        <div>
-          <p><strong>ID:</strong> {employeeIndex !== null ? employeeIndex + 1 : ''}</p> {/* Display sequential ID */}
-          <p><strong>Name:</strong> {employee.name}</p>
-          <p><strong>Salary:</strong> {employee.salary}</p>
-          <p><strong>Age:</strong> {employee.age}</p>
-          <Button variant="primary" href="/employees">Back to Employees</Button>
-        </div>
+
+      {loading ? (
+        <p>Loading...</p>
+      ) : error ? (
+        <Alert variant="danger">{error}</Alert>
       ) : (
-        <p>Employee not found.</p>
+        employee && (
+          <div>
+            <p><strong>ID:</strong> {employee.id}</p>
+            <p><strong>Name:</strong> {employee.employee_name}</p>
+            <p><strong>Salary:</strong> {employee.employee_salary}</p>
+            <p><strong>Age:</strong> {employee.employee_age}</p>
+            <Button variant="primary" href="/employees">Back to Employees</Button>
+          </div>
+        )
       )}
     </div>
   );

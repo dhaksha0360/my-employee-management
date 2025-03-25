@@ -2,71 +2,146 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Form, Button } from 'react-bootstrap';
+import { Form, Button, Alert } from 'react-bootstrap';
 
 const UpdateEmployeePage = () => {
   const router = useRouter();
   const params = useParams();
-  const id = Array.isArray(params.id) ? params.id[0] : params.id;  // Handle string or string[]
+  const id = Array.isArray(params.id) ? params.id[0] : params.id; // Handle string or string[]
 
   const [name, setName] = useState('');
   const [salary, setSalary] = useState('');
   const [age, setAge] = useState('');
-  const [employeeIndex, setEmployeeIndex] = useState<number | null>(null); // Store index of employee
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
+  // Fetch the employee data based on the id
   useEffect(() => {
     if (id) {
-      const storedEmployees = JSON.parse(localStorage.getItem('employees') || '[]');
-      const employee = storedEmployees.find((emp: any) => emp.id === parseInt(id));
+      const fetchEmployeeData = async () => {
+        try {
+          const response = await fetch(`https://dummy.restapiexample.com/api/v1/employee/${id}`);
 
-      if (employee) {
-        setName(employee.name);
-        setSalary(employee.salary);
-        setAge(employee.age);
+          // Ensure the response is JSON
+          const contentType = response.headers.get('Content-Type');
+          if (!contentType || !contentType.includes('application/json')) {
+            const textResponse = await response.text(); // Get raw text for inspection
+            throw new Error(`Invalid response type. Response: ${textResponse}`);
+          }
 
-        // Find the index of the employee in the array for sequential ID
-        const index = storedEmployees.findIndex((emp: any) => emp.id === parseInt(id));
-        setEmployeeIndex(index);
-      }
+          const data = await response.json();
+
+          if (response.ok && data.status === 'success') {
+            setName(data.data.employee_name);
+            setSalary(data.data.employee_salary);
+            setAge(data.data.employee_age);
+          } else {
+            throw new Error('Employee not found');
+          }
+        } catch (error: any) {
+          setError(error.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchEmployeeData();
     }
   }, [id]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (id) {
-      let storedEmployees = JSON.parse(localStorage.getItem('employees') || '[]');
-      storedEmployees = storedEmployees.map((emp: any) =>
-        emp.id === parseInt(id) ? { ...emp, name, salary, age } : emp
-      );
+    // Ensure salary and age are valid numbers
+    const parsedSalary = parseFloat(salary);
+    const parsedAge = parseInt(age, 10);
 
-      localStorage.setItem('employees', JSON.stringify(storedEmployees));
-      router.push('/employees');
+    if (isNaN(parsedSalary) || isNaN(parsedAge)) {
+      setError('Salary and Age must be valid numbers');
+      return;
+    }
+
+    const updatedEmployee = {
+      name,
+      salary: parsedSalary,
+      age: parsedAge,
+    };
+
+    try {
+      const response = await fetch(`https://dummy.restapiexample.com/api/v1/update/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedEmployee),
+      });
+
+      // Ensure the response is JSON
+      const contentType = response.headers.get('Content-Type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text(); // Get raw text to inspect
+        throw new Error(`Invalid response type. Response: ${textResponse}`);
+      }
+
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        router.push('/employees'); // Redirect to the employee list page
+      } else {
+        throw new Error('Failed to update employee');
+      }
+    } catch (error: any) {
+      setError(error.message);
     }
   };
 
   return (
     <div className="container mt-5">
       <h1 className="mb-4">Update Employee</h1>
-      <Form onSubmit={handleSubmit}>
-        <Form.Group className="mb-3">
-          <Form.Label>ID</Form.Label>
-          <Form.Control type="text" value={employeeIndex !== null ? employeeIndex + 1 : ''} disabled /> {/* Display sequential ID */}
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Name</Form.Label>
-          <Form.Control type="text" value={name} onChange={(e) => setName(e.target.value)} required />
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Salary</Form.Label>
-          <Form.Control type="text" value={salary} onChange={(e) => setSalary(e.target.value)} required />
-        </Form.Group>
-        <Form.Group className="mb-3">
-          <Form.Label>Age</Form.Label>
-          <Form.Control type="text" value={age} onChange={(e) => setAge(e.target.value)} required />
-        </Form.Group>
-        <Button variant="primary" type="submit">Update</Button>
-      </Form>
+
+      {loading ? (
+        <p>Loading...</p>
+      ) : error ? (
+        <Alert variant="danger">{error}</Alert>
+      ) : (
+        <Form onSubmit={handleSubmit}>
+          <Form.Group className="mb-3">
+            <Form.Label>ID</Form.Label>
+            <Form.Control type="text" value={id} disabled />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Name</Form.Label>
+            <Form.Control
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Salary</Form.Label>
+            <Form.Control
+              type="number"
+              value={salary}
+              onChange={(e) => setSalary(e.target.value)}
+              required
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Age</Form.Label>
+            <Form.Control
+              type="number"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              required
+            />
+          </Form.Group>
+          <Button variant="primary" type="submit">
+            Update
+          </Button>
+        </Form>
+      )}
     </div>
   );
 };
